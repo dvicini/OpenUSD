@@ -513,13 +513,18 @@ int _GetStackTraceName(char* buf, size_t len)
     // NOTE: This doesn't protect against other threads changing the
     //       temporary directory or program name for errors.
 
+    const char* tmpDir = ArchGetTmpDir();
+    const char* fallbackTmpDir = tmpDir ? tmpDir : "/tmp";
+    const char* progName = ArchGetProgramNameForErrors();
+    const char* fallbackProgName = progName ? progName : "unknown";
+
     // Count the string length required.
     size_t required =
-        asstrlen(ArchGetTmpDir()) +
+        asstrlen(fallbackTmpDir) +
         1 +     // "/"
         asstrlen(stackTracePrefix) +
         1 +     // "_"
-        asstrlen(ArchGetProgramNameForErrors()) +
+        asstrlen(fallbackProgName) +
         1 +     // "."
         asNumDigits(getpid()) +
         1;      // "\0"
@@ -532,11 +537,11 @@ int _GetStackTraceName(char* buf, size_t len)
         return -1;
     }
     else {
-        end = asstrcpy(end, ArchGetTmpDir());
+        end = asstrcpy(end, fallbackTmpDir);
         end = asstrcpy(end, "/");
         end = asstrcpy(end, stackTracePrefix);
         end = asstrcpy(end, "_");
-        end = asstrcpy(end, ArchGetProgramNameForErrors());
+        end = asstrcpy(end, fallbackProgName);
         end = asstrcpy(end, ".");
         end = asitoa(end, getpid());
     }
