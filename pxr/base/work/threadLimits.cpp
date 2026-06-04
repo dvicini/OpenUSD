@@ -15,6 +15,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <mutex>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 PXR_WORK_IMPL_NAMESPACE_USING_DIRECTIVE;
@@ -78,37 +79,40 @@ Work_OverrideConcurrencyLimit(unsigned weakValue, unsigned strongValue)
     return strongValue ? strongValue : weakValue;
 }
 
-static void 
+void 
 Work_InitializeThreading()
 {
-    // Get the thread limit from the environment setting. Note that this value
-    // can be 0, i.e. the environment setting does not apply.
-    const unsigned settingVal = WorkGetConcurrencyLimitSetting();
+    static std::once_flag once;
+    std::call_once(once, []() {
+        // Get the thread limit from the environment setting. Note that this value
+        // can be 0, i.e. the environment setting does not apply.
+        const unsigned settingVal = WorkGetConcurrencyLimitSetting();
 
-    // Threading is initialized with maximum physical concurrency.
-    const unsigned physicalLimit = WorkGetPhysicalConcurrencyLimit();
+        // Threading is initialized with maximum physical concurrency.
+        const unsigned physicalLimit = WorkGetPhysicalConcurrencyLimit();
 
-    // To assign the thread limit, override the initial limit with the
-    // environment setting. The environment setting always wins over the initial
-    // limit, unless it has been set to 0 (default). Semantically, 0 means
-    // "no change".
-    unsigned threadLimit =
-        Work_OverrideConcurrencyLimit(physicalLimit, settingVal);
+        // To assign the thread limit, override the initial limit with the
+        // environment setting. The environment setting always wins over the initial
+        // limit, unless it has been set to 0 (default). Semantically, 0 means
+        // "no change".
+        unsigned threadLimit =
+            Work_OverrideConcurrencyLimit(physicalLimit, settingVal);
 
-    // Only eagerly grab TBB if the PXR_WORK_THREAD_LIMIT setting was set to
-    // some non-zero value. Otherwise, the scheduler will be default initialized
-    // with maximum physical concurrency, or will be left untouched if
-    // previously initialized by the hosting environment (e.g. if we are running
-    // as a plugin to another application.)
-    if (settingVal) {
-        WorkImpl_InitializeThreading(threadLimit);
-    }
+        // Only eagerly grab TBB if the PXR_WORK_THREAD_LIMIT setting was set to
+        // some non-zero value. Otherwise, the scheduler will be default initialized
+        // with maximum physical concurrency, or will be left untouched if
+        // previously initialized by the hosting environment (e.g. if we are running
+        // as a plugin to another application.)
+        if (settingVal) {
+            WorkImpl_InitializeThreading(threadLimit);
+        }
+    });
 }
-static int _forceInitialization = (Work_InitializeThreading(), 0);
 
 void
 WorkSetConcurrencyLimit(unsigned n)
 {
+    Work_InitializeThreading();
     // We only assign a new concurrency limit if n is non-zero, since 0 means
     // "no change". Note that we need to re-initialize the TBB
     // task_scheduler_init instance in either case, because if the client
@@ -148,6 +152,7 @@ WorkSetConcurrencyLimitArgument(int n)
 unsigned
 WorkGetConcurrencyLimit()
 {
+    Work_InitializeThreading();
     return WorkImpl_GetConcurrencyLimit();
 }
 

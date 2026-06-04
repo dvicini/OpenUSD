@@ -96,6 +96,8 @@ WORK_API void WorkSetMaximumConcurrencyLimit();
 /// physical concurrency the limit will default to the physical concurrency.
 WORK_API bool WorkSupportsGranularThreadLimits();
 
+WORK_API void Work_InitializeThreading();
+
 PXR_NAMESPACE_CLOSE_SCOPE
 
 #endif
