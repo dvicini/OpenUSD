@@ -33,6 +33,11 @@ public:
         for (auto &id: _ids) {
             id.second->_Forget();
         }
+        for (auto &id: _ids) {
+            if (id.second->_refCount == 0) {
+                delete id.second;
+            }
+        }
     }
 
     SdfLayerHandle const &GetLayer() const {
