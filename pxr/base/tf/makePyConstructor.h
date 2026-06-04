@@ -203,7 +203,7 @@ void Install(object const &self, T const &t, TfErrorMark const &m) {
     // CODE_COVERAGE_OFF
     void *memory = Holder::
         // CODE_COVERAGE_ON
-        allocate(self.ptr(), offsetof(instance_t, storage), sizeof(Holder));
+        allocate(self.ptr(), offsetof(instance_t, storage), sizeof(Holder), alignof(Holder));
     try {
         HeldType held(t);
         Holder *holder = (new (memory) Holder(held));
