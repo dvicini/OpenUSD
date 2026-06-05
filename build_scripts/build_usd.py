@@ -1484,6 +1484,14 @@ def InstallOpenImageIO(context, force, buildArgs):
         # we reset it back to its old value.
         extraArgs.append('-DCMAKE_DEBUG_POSTFIX=""')
 
+        # Patch externalpackages.cmake to remove PREFER_CONFIG for TBB.
+        # This forces OIIO to use FindTBB.cmake which correctly finds our built TBB
+        # instead of system-installed TBB.
+        PatchFile("src/cmake/externalpackages.cmake",
+                  [('checked_find_package (TBB 2017\n                      SETVARIABLES OIIO_TBB\n                      PREFER_CONFIG)',
+                    'checked_find_package (TBB 2017\n                      SETVARIABLES OIIO_TBB)')],
+                  multiLineMatches=True)
+
         # Add on any user-specified extra arguments.
         extraArgs += buildArgs
 
