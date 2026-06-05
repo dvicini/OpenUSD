@@ -1196,6 +1196,12 @@ def InstallTBB_Linux(context, force, buildArgs):
         AppendCXX11ABIArg("CXXFLAGS", context, buildArgs)
 
         # TBB does not support out-of-source builds in a custom location.
+        cxx = os.environ.get("CXX", "")
+        cc = os.environ.get("CC", "")
+        if "clang" in cxx or "clang" in cc:
+            if not any(arg.startswith("compiler=") for arg in buildArgs):
+                buildArgs.append("compiler=clang")
+
         makeTBBCmd = 'make -j{procs} {buildArgs}'.format(
             procs=context.numJobs, 
             buildArgs=" ".join(buildArgs))
