@@ -674,13 +674,13 @@ namespace objects
 
   namespace
   {
-    extern "C" PyObject* no_init(PyObject*, PyObject*)
+    extern "C" PyObject* pxr_no_init(PyObject*, PyObject*)
     {
         ::PyErr_SetString(::PyExc_RuntimeError, const_cast<char*>("This class cannot be instantiated from Python"));
         return NULL;
     }
     static ::PyMethodDef no_init_def = {
-        const_cast<char*>("__init__"), no_init, METH_VARARGS,
+        const_cast<char*>("__init__"), pxr_no_init, METH_VARARGS,
         const_cast<char*>("Raises an exception\n"
                           "This class cannot be instantiated from Python\n")
     };

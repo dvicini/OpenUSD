@@ -133,12 +133,12 @@ namespace
 
   // identity_unaryfunc/py_object_identity -- manufacture a unaryfunc
   // "slot" which just returns its argument. 
-  extern "C" PyObject* identity_unaryfunc(PyObject* x)
+  extern "C" PyObject* pxr_identity_unaryfunc(PyObject* x)
   {
       Py_INCREF(x);
       return x;
   }
-  unaryfunc py_object_identity = identity_unaryfunc;
+  unaryfunc py_object_identity = pxr_identity_unaryfunc;
 
 #if PY_VERSION_HEX >= 0x03000000
   // As in Python 3 there is only one integer type, we can have much
@@ -445,11 +445,11 @@ namespace
 #if defined(Py_USING_UNICODE)
   // encode_string_unaryfunc/py_encode_string -- manufacture a unaryfunc
   // "slot" which encodes a Python string using the default encoding
-  extern "C" PyObject* encode_string_unaryfunc(PyObject* x)
+  extern "C" PyObject* pxr_encode_string_unaryfunc(PyObject* x)
   {
       return PyUnicode_FromEncodedObject( x, 0, 0 );
   }
-  unaryfunc py_encode_string = encode_string_unaryfunc;
+  unaryfunc py_encode_string = pxr_encode_string_unaryfunc;
 
   // A SlotPolicy for extracting C++ strings from Python objects.
   struct wstring_rvalue_from_python
