@@ -168,11 +168,11 @@ static void _WriteOutput(HdFormat format, uint8_t *dst,
             ((float*)dst)[c] =
                 (c < valueComponents) ? (float)(value[c]) : 0.0f;
         } else if (componentFormat == HdFormatUNorm8) {
-            ((uint8_t*)dst)[c] =
-                (c < valueComponents) ? (uint8_t)(value[c] * 255.0f) : 0.0f;
+            ((uint8_t*)dst)[c] = (c < valueComponents) ?
+                (uint8_t)std::max(0.0f, std::min(255.0f, value[c] * 255.0f)) : 0.0f;
         } else if (componentFormat == HdFormatSNorm8) {
-            ((int8_t*)dst)[c] =
-                (c < valueComponents) ? (int8_t)(value[c] * 127.0f) : 0.0f;
+            ((int8_t*)dst)[c] = (c < valueComponents) ?
+                (int8_t)std::max(-128.0f, std::min(127.0f, value[c] * 127.0f)) : 0.0f;
         }
     }
 }
@@ -276,11 +276,11 @@ HdEmbreeRenderBuffer::Resolve()
             } else if (componentFormat == HdFormatFloat32) {
                 ((float*)dst)[c] = ((float*)src)[c] / sampleCount;
             } else if (componentFormat == HdFormatUNorm8) {
-                ((uint8_t*)dst)[c] = (uint8_t)
-                    (((float*)src)[c] * 255.0f / sampleCount);
+                ((uint8_t*)dst)[c] = (uint8_t)std::max(0.0f,
+                    std::min(255.0f, ((float*)src)[c] * 255.0f / sampleCount));
             } else if (componentFormat == HdFormatSNorm8) {
-                ((int8_t*)dst)[c] = (int8_t)
-                    (((float*)src)[c] * 127.0f / sampleCount);
+                ((int8_t*)dst)[c] = (int8_t)std::max(-128.0f,
+                    std::min(127.0f, ((float*)src)[c] * 127.0f / sampleCount));
             }
         }
     }
