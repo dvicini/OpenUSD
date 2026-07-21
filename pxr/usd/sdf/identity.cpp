@@ -32,6 +32,9 @@ public:
         TfSpinMutex::ScopedLock lock(_idsMutex);
         for (auto &id: _ids) {
             id.second->_Forget();
+            if (id.second->_refCount == 0) {
+                delete id.second;
+            }
         }
     }
 
