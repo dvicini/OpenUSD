@@ -26,6 +26,8 @@ class VdfNode;
 class Exec_NodeRecompilationInfoTable
 {
 public:
+    ~Exec_NodeRecompilationInfoTable();
+
     /// De-initializes recompilation info for the deleted \p node if it has any.
     void WillDeleteNode(const VdfNode *node);
 

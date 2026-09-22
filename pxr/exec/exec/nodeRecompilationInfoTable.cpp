@@ -18,6 +18,18 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+Exec_NodeRecompilationInfoTable::~Exec_NodeRecompilationInfoTable()
+{
+    for (_Storage &storage : _storageVector) {
+        if (storage.isInfoConstructed) {
+            auto *const info =
+                reinterpret_cast<Exec_NodeRecompilationInfo *>(storage.buffer);
+            info->~Exec_NodeRecompilationInfo();
+            storage.isInfoConstructed = false;
+        }
+    }
+}
+
 void
 Exec_NodeRecompilationInfoTable::WillDeleteNode(const VdfNode *const node)
 {
