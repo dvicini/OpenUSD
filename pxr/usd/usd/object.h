@@ -767,4 +767,36 @@ UsdObject::_GetMetadataImpl(const TfToken& key,
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
+#ifdef PXR_PYTHON_SUPPORT_ENABLED
+
+#include <nanobind/nanobind.h>
+
+PXR_NAMESPACE_OPEN_SCOPE
+
+USD_API PyObject *Usd_ObjectSubclassConvertToPython(const UsdObject *obj);
+
+PXR_NAMESPACE_CLOSE_SCOPE
+
+namespace nanobind::detail {
+
+template <>
+struct type_caster<PXR_NS::UsdObject>
+    : type_caster_base<PXR_NS::UsdObject> {
+    static handle from_cpp(const PXR_NS::UsdObject &src, rv_policy,
+                           cleanup_list *) noexcept {
+        return handle(PXR_NS::Usd_ObjectSubclassConvertToPython(&src));
+    }
+    static handle from_cpp(const PXR_NS::UsdObject *src, rv_policy policy,
+                           cleanup_list *cleanup) noexcept {
+        if (!src) {
+            return none().release();
+        }
+        return from_cpp(*src, policy, cleanup);
+    }
+};
+
+} // namespace nanobind::detail
+
+#endif // PXR_PYTHON_SUPPORT_ENABLED
+
 #endif //PXR_USD_USD_OBJECT_H

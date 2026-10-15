@@ -422,4 +422,35 @@ private:
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
+#ifdef PXR_PYTHON_SUPPORT_ENABLED
+
+#include <nanobind/nanobind.h>
+
+PXR_NAMESPACE_OPEN_SCOPE
+
+USD_API PyObject *Usd_PrimRangeToPython(const UsdPrimRange &primRange);
+USD_API bool Usd_PrimRangeFromPython(PyObject *obj, UsdPrimRange *out);
+
+PXR_NAMESPACE_CLOSE_SCOPE
+
+namespace nanobind::detail {
+
+template <>
+struct type_caster<PXR_NS::UsdPrimRange> {
+    NB_TYPE_CASTER(PXR_NS::UsdPrimRange, const_name("PrimRange"))
+
+    bool from_python(handle src, uint8_t, cleanup_list *) noexcept {
+        return PXR_NS::Usd_PrimRangeFromPython(src.ptr(), &value);
+    }
+
+    static handle from_cpp(const PXR_NS::UsdPrimRange &src, rv_policy,
+                           cleanup_list *) noexcept {
+        return handle(PXR_NS::Usd_PrimRangeToPython(src));
+    }
+};
+
+} // namespace nanobind::detail
+
+#endif // PXR_PYTHON_SUPPORT_ENABLED
+
 #endif // PXR_USD_USD_PRIM_RANGE_H

@@ -11,9 +11,9 @@
 /// Macros for creating Python bindings for objects used with 
 /// ArResolverContext.
 
-#include "pxr/external/boost/python/implicit.hpp"
-
+#include "pxr/base/tf/pyNanobindBridge.h"
 #include "pxr/pxr.h"
+#include "pxr/usd/ar/api.h"
 #include "pxr/usd/ar/resolverContext.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -28,12 +28,36 @@ ArWrapResolverContextForPython();
 
 #ifndef doxygen
 
+using Ar_ConvertContextFromPythonFn =
+    bool (*)(PyObject*, ArResolverContext*);
+
+AR_API
+void Ar_RegisterResolverContextForPython(Ar_ConvertContextFromPythonFn fn);
+
+AR_API
+bool Ar_ConvertFromPythonToResolverContext(
+    PyObject* obj, ArResolverContext* ctx);
+
+template <class Context>
+bool Ar_ConvertContextFromPython(PyObject* obj, ArResolverContext* ctx)
+{
+    Context* ptr = nullptr;
+    if (NB_CALL(nb_type_get)(NB_CTX, &typeid(Context), obj, 0, nullptr,
+                             reinterpret_cast<void**>(&ptr)) && ptr) {
+        if (ctx) {
+            *ctx = ArResolverContext(*ptr);
+        }
+        return true;
+    }
+    return false;
+}
+
 template <class Context>
 void 
 ArWrapResolverContextForPython()
 {
-    pxr_boost::python::implicitly_convertible<Context, ArResolverContext>();
-};
+    Ar_RegisterResolverContextForPython(&Ar_ConvertContextFromPython<Context>);
+}
 
 #endif //doxygen
 

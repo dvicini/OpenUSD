@@ -14,7 +14,7 @@
 #include "pxr/base/tf/pyUtils.h"
 #include "pxr/base/tf/type.h"
 
-#include "pxr/external/boost/python/object.hpp"
+#include <utility>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -25,11 +25,11 @@ TF_REGISTRY_FUNCTION(TfType)
 
 namespace {
 
-// A custom deleter for shared_ptr<pxr_boost::python::object> that takes the
+// A custom deleter for shared_ptr<nanobind::object> that takes the
 // python lock before deleting the python object.  This is necessary since it's
 // invalid to decrement the python refcount without holding the lock.
 struct _DeleteObjectWithLock {
-    void operator()(pxr_boost::python::object *obj) const {
+    void operator()(nanobind::object *obj) const {
         PXR_NS::TfPyLock lock;
         delete obj;
     }
@@ -39,13 +39,13 @@ struct _DeleteObjectWithLock {
 TfPyObjWrapper::TfPyObjWrapper()
 {
     TfPyLock lock;
-    TfPyObjWrapper none((pxr_boost::python::object())); // <- extra parens for "most
-                                                    // vexing parse".
-    *this = none;
+    *this = TfPyObjWrapper(nanobind::none());
 }
 
-TfPyObjWrapper::TfPyObjWrapper(pxr_boost::python::object obj)
-    : _objectPtr(new object(obj), _DeleteObjectWithLock())
+TfPyObjWrapper::TfPyObjWrapper(nanobind::object obj)
+    : _objectPtr(
+          new object(obj.is_valid() ? std::move(obj) : nanobind::none()),
+          _DeleteObjectWithLock())
 {
 }
 
@@ -64,7 +64,7 @@ TfPyObjWrapper::operator==(TfPyObjWrapper const &other) const
 
     // Otherwise lock and let python determine equality.
     TfPyLock lock;
-    return Get() == other.Get();
+    return Get().equal(other.Get());
 }
 
 bool

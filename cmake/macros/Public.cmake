@@ -267,8 +267,8 @@ function(pxr_library NAME)
         endif()
 
         if(libraryRequiresPython)
-            list(APPEND args_LIBRARIES ${PYTHON_LIBRARIES} python)
-            list(APPEND args_INCLUDE_DIRS ${PYTHON_INCLUDE_DIRS})
+            list(APPEND args_LIBRARIES ${PYTHON_LIBRARIES})
+            list(APPEND args_INCLUDE_DIRS ${PYTHON_INCLUDE_DIRS} "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/pxr/external/nanobind/include>")
         endif()
     endif()
 
@@ -398,7 +398,7 @@ function(pxr_library NAME)
     if(PXR_ENABLE_PYTHON_SUPPORT AND
        (args_PYMODULE_CPPFILES OR args_PYMODULE_DIRS OR
         args_PYMODULE_FILES OR args_PYSIDE_UI_FILES))
-        list(APPEND pythonModuleIncludeDirs ${PYTHON_INCLUDE_DIRS})
+        list(APPEND pythonModuleIncludeDirs ${PYTHON_INCLUDE_DIRS} "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/pxr/external/nanobind/include>")
 
         _pxr_python_module(
             ${NAME}

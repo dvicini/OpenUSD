@@ -15,14 +15,45 @@
 
 #include "pxr/base/tf/hash.h"
 #include "pxr/base/tf/hashmap.h"
+#include "pxr/base/tf/pyNanobindBridge.h"
 #include "pxr/base/tf/pyUtils.h"
 #include "pxr/base/tf/singleton.h"
+#include "pxr/base/tf/stringUtils.h"
 
 #include "pxr/base/tf/pySafePython.h"
 
+#include <string>
+#include <type_traits>
 #include <vector>
 
 PXR_NAMESPACE_OPEN_SCOPE
+
+// Lets python explicitly pass in values of C++ types which have no python
+// equivalents.
+struct Vt_ValueWrapper {
+    template <class T>
+    static Vt_ValueWrapper Create(T a) { return Vt_ValueWrapper(a); }
+
+    template <typename T> explicit Vt_ValueWrapper(T val) : _val(val) {}
+
+    VtValue const &GetValue() const { return _val; }
+
+    bool operator==(const Vt_ValueWrapper &other) const {
+        return _val == other._val;
+    }
+
+    bool operator!=(const Vt_ValueWrapper &other) const {
+        return _val != other._val;
+    }
+
+    std::string GetAsString() const {
+        return TfStringPrintf(
+            "%s(%s)", _val.GetTypeName().c_str(), TfStringify(_val).c_str());
+    }
+
+private:
+    VtValue _val;
+};
 
 /// \class Vt_ValueFromPythonRegistry
 ///
@@ -72,7 +103,7 @@ private:
         static VtValue _ExtractLValue(PyObject *);
 
         // _ExtractRValue will attempt to obtain an r-value T from the python
-        // object it's passed.  This allows boost.python to invoke type
+        // object it's passed.  This allows nanobind to invoke type
         // conversions to produce the T.
         template <class T>
         static VtValue _ExtractRValue(PyObject *);
@@ -119,18 +150,39 @@ VT_API_TEMPLATE_CLASS(TfSingleton<Vt_ValueFromPythonRegistry>);
 template <class T>
 VtValue Vt_ValueFromPythonRegistry::
 _Extractor::_ExtractLValue(PyObject *obj) {
-    pxr_boost::python::extract<T &> x(obj);
-    if (x.check())
-        return VtValue(x());
+    if constexpr (!std::is_enum_v<T>) {
+        T *ptr = nullptr;
+        if (NB_CALL(nb_type_get)(
+                NB_CTX, &typeid(T), obj, 0, nullptr,
+                reinterpret_cast<void **>(&ptr)) && ptr) {
+            return VtValue(*ptr);
+        }
+        if (PyErr_Occurred()) {
+            PyErr_Clear();
+        }
+    }
     return VtValue();
 }
 
 template <class T>
 VtValue Vt_ValueFromPythonRegistry::
 _Extractor::_ExtractRValue(PyObject *obj) {
-    pxr_boost::python::extract<T> x(obj);
-    if (x.check())
-        return VtValue(x());
+    nanobind::detail::make_caster<T> caster;
+    nanobind::detail::cleanup_list cleanup(obj);
+    bool ok = caster.from_python(
+        nanobind::handle(obj),
+        static_cast<uint8_t>(nanobind::detail::cast_flags::convert),
+        &cleanup);
+    if (ok) {
+        VtValue result(
+            static_cast<T>(caster.operator nanobind::detail::cast_t<T>()));
+        cleanup.release();
+        return result;
+    }
+    cleanup.release();
+    if (PyErr_Occurred()) {
+        PyErr_Clear();
+    }
     return VtValue();
 }
 

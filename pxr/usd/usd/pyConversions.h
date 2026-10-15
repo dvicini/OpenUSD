@@ -10,10 +10,12 @@
 #include "pxr/pxr.h"
 #include "pxr/usd/usd/api.h"
 #include "pxr/base/tf/pyObjWrapper.h"
+#include "pxr/base/vt/value.h"
+#include "pxr/base/tf/pyNanobindBridge.h"
+#include <nanobind/nanobind.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-class VtValue;
 class TfToken;
 class SdfValueTypeName;
 
@@ -32,6 +34,13 @@ USD_API
 VtValue UsdPythonToSdfType(TfPyObjWrapper pyVal,
                            SdfValueTypeName const &targetType);
 
+inline VtValue UsdPythonToSdfType(nanobind::handle pyVal,
+                                  SdfValueTypeName const &targetType) {
+    return UsdPythonToSdfType(
+        TfPyObjWrapper(nanobind::borrow<nanobind::object>(pyVal)),
+        targetType);
+}
+
 /// Helper for converting a python value to a metadata value for metadata
 /// known to the SdfSchema.  Generates a coding error if \p key is unknown
 /// to the SdfSchema.
@@ -47,6 +56,20 @@ USD_API
 bool UsdPythonToMetadataValue(const TfToken &key, const TfToken &keyPath, 
                               TfPyObjWrapper pyVal, VtValue *result);
 
+inline bool UsdPythonToMetadataValue(const TfToken &key, const TfToken &keyPath,
+                                     nanobind::handle pyVal, VtValue *result) {
+    return UsdPythonToMetadataValue(
+        key, keyPath,
+        TfPyObjWrapper(nanobind::borrow<nanobind::object>(pyVal)),
+        result);
+}
+
+class UsdPrimRange;
+
+USD_API
+void Usd_RegisterPrimRangePythonConversions(
+    PyObject *(*toPy)(const UsdPrimRange &),
+    bool (*fromPy)(PyObject *, UsdPrimRange *));
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

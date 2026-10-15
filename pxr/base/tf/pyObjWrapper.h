@@ -17,11 +17,12 @@
 // for build issues when including Python.h
 #include "pxr/base/tf/pySafePython.h"
 
-#include "pxr/external/boost/python/object_fwd.hpp"
-#include "pxr/external/boost/python/object_operators.hpp"
+#include <nanobind/nanobind.h>
 
 #include <iosfwd>
 #include <memory>
+#include <type_traits>
+#include <utility>
 
 #else
 
@@ -49,35 +50,29 @@ private:
 
 /// \class TfPyObjWrapper
 ///
-/// Boost Python object wrapper.
+/// Python object wrapper.
 ///
-/// Provides a wrapper around pxr_boost::python::object that works correctly for the
+/// Provides a wrapper around nanobind::object that works correctly for the
 /// following basic operations regardless of the GIL state: default construction,
 /// copy construction, assignment, (in)equality comparison, hash_value(), and
 /// destruction.
 ///
 /// None of those work correctly in the presence of an unlocked GIL for
-/// pxr_boost::python::object.  This class only actually acquires the GIL for default
+/// nanobind::object.  This class only actually acquires the GIL for default
 /// construction, destruction and for some (in)equality comparisons.  The other
 /// operations do not require taking the GIL.
 ///
-/// This is primarily useful in cases where a pxr_boost::python::object might be
+/// This is primarily useful in cases where a nanobind::object might be
 /// destroyed without a locked GIL by a client blind to that fact.  This occurs
 /// when a registry, for example, holds type-erased objects.  If one
 /// of the type-erased objects in the registry happens to hold a
-/// pxr_boost::python::object, that type-erased object must be destroyed while the
+/// nanobind::object, that type-erased object must be destroyed while the
 /// GIL is held but it's unreasonable to require that the registry know that.
 /// This class helps solve that problem.
-///
-/// This class also provides many of the operators that pxr_boost::python::object
-/// provides, by virtue of deriving from pxr_boost::python::api::object_operators<T>.
-/// However it is important to note that callers must ensure the GIL is held
-/// before using these operators!
 #ifdef PXR_PYTHON_SUPPORT_ENABLED
 class TfPyObjWrapper
-    : public pxr_boost::python::api::object_operators<TfPyObjWrapper>
 {
-    typedef pxr_boost::python::object object;
+    typedef nanobind::object object;
 
 public:
 
@@ -90,6 +85,18 @@ public:
     /// conversion is intended here.
     TF_API TfPyObjWrapper(object obj);
 
+    /// Construct a TfPyObjWrapper borrowing a reference from \a h.
+    /// The GIL must be held by the caller.
+    TfPyObjWrapper(nanobind::handle h)
+        : TfPyObjWrapper(h.is_valid()
+                             ? nanobind::borrow<object>(h)
+                             : nanobind::none()) {}
+
+    /// Construct a TfPyObjWrapper from a nanobind accessor.
+    template <typename Impl>
+    TfPyObjWrapper(nanobind::detail::accessor<Impl> const &acc)
+        : TfPyObjWrapper(object(acc)) {}
+
     /// Underlying object access.
     /// This method returns a reference, so technically, the GIL need not be
     /// held to call this.  However, the caller is strongly advised to ensure
@@ -97,6 +104,16 @@ public:
     /// operating on the returned object requires it.
     object const &Get() const {
         return *_objectPtr;
+    }
+
+    /// Implicit conversion to nanobind::object const &.
+    operator object const &() const {
+        return Get();
+    }
+
+    /// Return true if the wrapped Python object is valid and not None.
+    explicit operator bool() const {
+        return Get().is_valid() && !Get().is_none();
     }
 
     /// Underlying PyObject* access.
@@ -107,6 +124,30 @@ public:
     /// is a "borrowed reference", meaning that the underlying object's
     /// reference count has not been incremented on behalf of the caller.
     TF_API PyObject *ptr() const;
+
+    /// Call operator forwarding to the underlying Python object.
+    /// The GIL must be held by the caller.
+    template <typename... Args>
+    object operator()(Args&&... args) const {
+        return Get()(std::forward<Args>(args)...);
+    }
+
+    /// Subscript operator forwarding to the underlying Python object.
+    /// The GIL must be held by the caller.
+    template <typename Key>
+    auto operator[](Key&& key) const {
+        return Get()[std::forward<Key>(key)];
+    }
+
+    /// Attribute access forwarding to the underlying Python object.
+    /// The GIL must be held by the caller.
+    auto attr(const char *key) const {
+        return Get().attr(key);
+    }
+
+    auto attr(nanobind::handle key) const {
+        return Get().attr(key);
+    }
 
     /// Produce a hash code for this object.
     /// Note that this does not attempt to hash the underlying python object,
@@ -125,13 +166,6 @@ public:
     TF_API bool operator!=(TfPyObjWrapper const &other) const;
 
 private:
-
-    // Befriend object_operators to allow it access to implicit conversion to
-    // pxr_boost::python::object.
-    friend class pxr_boost::python::api::object_operators<TfPyObjWrapper>;
-    operator object const &() const {
-        return Get();
-    }
 
     // Store a shared_ptr to a python object.
     std::shared_ptr<object> _objectPtr;

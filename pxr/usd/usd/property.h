@@ -300,4 +300,28 @@ private:
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
+#ifdef PXR_PYTHON_SUPPORT_ENABLED
+
+namespace nanobind::detail {
+
+template <>
+struct type_caster<PXR_NS::UsdProperty>
+    : type_caster_base<PXR_NS::UsdProperty> {
+    static handle from_cpp(const PXR_NS::UsdProperty &src, rv_policy,
+                           cleanup_list *) noexcept {
+        return handle(PXR_NS::Usd_ObjectSubclassConvertToPython(&src));
+    }
+    static handle from_cpp(const PXR_NS::UsdProperty *src, rv_policy policy,
+                           cleanup_list *cleanup) noexcept {
+        if (!src) {
+            return none().release();
+        }
+        return from_cpp(*src, policy, cleanup);
+    }
+};
+
+} // namespace nanobind::detail
+
+#endif // PXR_PYTHON_SUPPORT_ENABLED
+
 #endif // PXR_USD_USD_PROPERTY_H

@@ -319,14 +319,7 @@ protected:
             return GetObj(lhs) == GetObj(rhs);
         }
 
-        static TfPyObjWrapper _GetPyObj(_RefdObjPtr storage) {
-#ifdef PXR_PYTHON_SUPPORT_ENABLED
-            TfPyLock lock;
-            return pxr_boost::python::api::object(GetObj(storage));
-#else
-            return {};
-#endif
-        }
+        static TfPyObjWrapper _GetPyObj(_RefdObjPtr storage);
 
         // Defined below.
         static VtValue _GetVtValue(_RefdObjPtr storage);
@@ -605,7 +598,7 @@ protected:
     // class.  This lets the wrapper reach down into a value to get a
     // pxr_boost::python wrapped object corresponding to the viewed type.  This
     // facility is necessary to get the python API we want.
-    friend TfPyObjWrapper
+    friend VT_API TfPyObjWrapper
     Vt_GetPythonObjectFromHeldValue(VtValueRef const &self);
 
     VT_API TfPyObjWrapper _GetPythonObject() const;
@@ -791,36 +784,121 @@ PXR_NAMESPACE_CLOSE_SCOPE
 
 #ifdef PXR_PYTHON_SUPPORT_ENABLED
 
-#include "pxr/external/boost/python/converter/arg_from_python.hpp"
-#include <optional>
+#include "pxr/base/tf/pyNanobindBridge.h"
 
-namespace PXR_BOOST_NAMESPACE::python::converter {
+PXR_NAMESPACE_OPEN_SCOPE
 
-// We specialize arg_rvalue_from_python<VtValueRef> to derive
-// arg_rvalue_from_python<VtValue>.  This way we get storage for both -- an
-// `rvalue_from_python_data<VtValue &> m_data` in the base and a VtValueRef in
-// this class.  There's no other way afaict to "add space" in an rvalue
-// converter to support a "view" type where we need to also conjure a temporary
-// for that view.  This way we can create the `VtValue` in the base as usual and
-// let the `VtValueRef` here refer to it for the lifetime of the arg.
+VT_API bool VtValueFromPythonObject(PyObject *obj, VtValue *out);
+VT_API TfPyObjWrapper Vt_GetPythonObjectFromHeldValue(VtValue const &self);
+VT_API TfPyObjWrapper Vt_GetPythonObjectFromHeldValue(VtValueRef const &self);
+
+PXR_NAMESPACE_CLOSE_SCOPE
+
+namespace nanobind::detail {
+
 template <>
-struct arg_rvalue_from_python<PXR_NS::VtValueRef>
-    : public arg_rvalue_from_python<PXR_NS::VtValue>
-{
-    using base_type = arg_rvalue_from_python<PXR_NS::VtValue>;
-    using base_type::convertible;
-    using result_type = PXR_NS::VtValueRef &; // boost.python convention.
+struct type_caster<PXR_NS::VtValue> {
+    NB_TYPE_CASTER(PXR_NS::VtValue, const_name("Any"))
 
-    VT_API arg_rvalue_from_python(PyObject* obj);
+    bool from_python(handle src, uint8_t, cleanup_list *) noexcept {
+        if (!src.is_valid()) {
+            return false;
+        }
+        return PXR_NS::VtValueFromPythonObject(src.ptr(), &value);
+    }
 
-    VT_API result_type operator()();
-    
-    std::optional<PXR_NS::VtValueRef> optValueRef;
+    static handle from_cpp(PXR_NS::VtValue const &val, rv_policy,
+                           cleanup_list *) noexcept {
+        if (val.IsEmpty()) {
+            Py_RETURN_NONE;
+        }
+        PXR_NS::TfPyObjWrapper obj =
+            PXR_NS::Vt_GetPythonObjectFromHeldValue(val);
+        PyObject *p = obj.ptr();
+        if (!p) {
+            return handle();
+        }
+        Py_INCREF(p);
+        return handle(p);
+    }
 };
 
-} // namespace PXR_BOOST_NAMESPACE::python::converter
+template <>
+struct type_caster<PXR_NS::VtValueRef> {
+    NB_TYPE_CASTER(PXR_NS::VtValueRef, const_name("Any"))
+    PXR_NS::VtValue heldValue;
+
+    bool from_python(handle src, uint8_t, cleanup_list *) noexcept {
+        if (!src.is_valid()) {
+            return false;
+        }
+        if (!PXR_NS::VtValueFromPythonObject(src.ptr(), &heldValue)) {
+            return false;
+        }
+        value = PXR_NS::VtValueRef(heldValue);
+        return true;
+    }
+
+    static handle from_cpp(PXR_NS::VtValueRef const &val, rv_policy,
+                           cleanup_list *) noexcept {
+        if (val.IsEmpty()) {
+            Py_RETURN_NONE;
+        }
+        PXR_NS::TfPyObjWrapper obj =
+            PXR_NS::Vt_GetPythonObjectFromHeldValue(val);
+        PyObject *p = obj.ptr();
+        if (!p) {
+            return handle();
+        }
+        Py_INCREF(p);
+        return handle(p);
+    }
+};
+
+} // namespace nanobind::detail
 
 #endif // PXR_PYTHON_SUPPORT_ENABLED
 
-#endif // PXR_BASE_VT_VALUEREF_H
+PXR_NAMESPACE_OPEN_SCOPE
 
+template <class T>
+TfPyObjWrapper
+VtValue::_TypedProxyHelper<T>::GetPyObj(T const &obj)
+{
+#ifdef PXR_PYTHON_SUPPORT_ENABLED
+    ProxiedType const &p = VtGetProxiedObject(obj);
+    TfPyLock lock;
+    return Tf_PyObjFromCpp(p);
+#else
+    return {};
+#endif // PXR_PYTHON_SUPPORT_ENABLED
+}
+
+template <class ErasedProxy>
+TfPyObjWrapper
+VtValue::_ErasedProxyHelper<ErasedProxy>::GetPyObj(ErasedProxy const &obj)
+{
+#ifdef PXR_PYTHON_SUPPORT_ENABLED
+    VtValue const *val = VtGetErasedProxiedVtValue(obj);
+    TfPyLock lock;
+    return Tf_PyObjFromCpp(*val);
+#else
+    return {};
+#endif // PXR_PYTHON_SUPPORT_ENABLED
+}
+
+template <class T, bool B>
+TfPyObjWrapper
+VtValueRef::_TypeInfoImpl<T, B>::_GetPyObj(_RefdObjPtr storage)
+{
+#ifdef PXR_PYTHON_SUPPORT_ENABLED
+    TfPyLock lock;
+    return Tf_PyObjFromCpp(GetObj(storage));
+#else
+    return {};
+#endif // PXR_PYTHON_SUPPORT_ENABLED
+}
+
+PXR_NAMESPACE_CLOSE_SCOPE
+
+#endif // PXR_BASE_VT_VALUEREF_H

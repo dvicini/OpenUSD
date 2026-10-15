@@ -7,12 +7,12 @@
 #ifndef PXR_USD_PCP_PY_UTILS_H
 #define PXR_USD_PCP_PY_UTILS_H
 
-#include "pxr/external/boost/python/dict.hpp"
-
+#include "pxr/base/tf/pyNanobindBridge.h"
 #include "pxr/pxr.h"
 #include "pxr/usd/pcp/api.h"
 #include "pxr/usd/pcp/types.h"
 
+#include <nanobind/nanobind.h>
 #include <string>
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -22,7 +22,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 PCP_API
 bool
 PcpVariantFallbackMapFromPython(
-    const pxr_boost::python::dict& dict,
+    const nanobind::dict& dict,
     PcpVariantFallbackMap *result);
 
 PXR_NAMESPACE_CLOSE_SCOPE
